@@ -1,64 +1,66 @@
-# 2FA 验证器
+[中文](README.zh-CN.md)
 
-基于 TOTP（RFC 6238）的双因素认证验证码生成器，支持网页版和命令行版。
+# 2FA Authenticator
 
-## 功能
+A TOTP (RFC 6238) based two-factor authentication code generator with both web and command-line interfaces.
 
-- **网页版** — 圆环倒计时、点击一键复制、多账号管理
-- **命令行版** — 零依赖、纯 Python 标准库实现
-- **通用兼容** — 支持 GitHub、Google、Microsoft、Steam 等所有使用 TOTP 的服务
-- **数据本地存储** — 密钥保存在浏览器 localStorage / 本地文件，不上传任何地方
+## Features
 
-## 快速开始
+- **Web UI** — Ring countdown timer, one-click copy, multi-account management
+- **CLI** — Zero dependencies, pure Python standard library
+- **Universal Compatibility** — Works with GitHub, Google, Microsoft, Steam, and all TOTP-based services
+- **Local Storage** — Keys are saved in browser localStorage / local files, never uploaded anywhere
 
-### 网页版（推荐）
+## Quick Start
 
-双击 `验证码.bat` 即可在浏览器中打开。
+### Web UI (Recommended)
 
-1. 点击 **添加**，输入名称和密钥
-2. 点击验证码即可复制到剪贴板
-3. 圆环倒计时显示剩余有效时间（绿色 → 黄色 → 红色）
+Double-click `验证码.bat` to open in your browser.
 
-### 命令行版
+1. Click **Add**, enter a name and secret key
+2. Click the code to copy it to clipboard
+3. The ring countdown shows remaining validity time (green → yellow → red)
+
+### CLI
 
 ```bash
-# 添加账号
+# Add account
 python totp.py add github YOUR_SECRET_KEY
 
-# 生成验证码
+# Generate code
 python totp.py github
 
-# 列出所有账号
+# List all accounts
 python totp.py list
 
-# 删除账号
+# Remove account
 python totp.py remove github
 ```
 
-## 如何获取密钥
+## How to Get Your Secret Key
 
-以 GitHub 为例：
+Using GitHub as an example:
 
 1. Settings → Password and authentication → Two-factor authentication
-2. 点击 Authenticator app 的 **Edit**
-3. 点击 **setup key** 链接，即可看到你的密钥（Base32 格式）
-4. 将密钥添加到本工具中
+2. Click **Edit** on Authenticator app
+3. Click the **setup key** link to view your key (Base32 format)
+4. Add the key to this tool
 
-## 原理
+## How It Works
 
 ```
-密钥 (Secret Key) + 当前时间 → HMAC-SHA1 → 动态截断 → 6位验证码
+Secret Key + Current Time → HMAC-SHA1 → Dynamic Truncation → 6-digit Code
 ```
 
-- 算法公开（RFC 6238），安全性依赖密钥保密
-- 验证码每 30 秒自动更新，防止被截获重用
-- 密钥只存储在本地设备上，不会上传到任何服务器
+- Algorithm is public (RFC 6238), security relies on keeping the secret key private
+- Codes auto-refresh every 30 seconds to prevent replay attacks
+- Keys are stored locally only, never uploaded to any server
 
-## 技术栈
+## Tech Stack
 
-- 前端：原生 HTML/CSS/JavaScript + Web Crypto API
-- 后端：Python 标准库（hashlib, hmac, base64）
-- 无第三方依赖
+- Frontend: Vanilla HTML/CSS/JavaScript + Web Crypto API
+- Backend: Python standard library (hashlib, hmac, base64)
+- No third-party dependencies
 
 ## License
 
