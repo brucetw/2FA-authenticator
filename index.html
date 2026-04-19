@@ -20,12 +20,31 @@ body {
   margin: 0 auto;
 }
 
-h1 {
-  text-align: center;
-  font-size: 24px;
+.header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   margin-bottom: 32px;
-  color: #58a6ff;
+  gap: 12px;
 }
+
+h1 {
+  font-size: 24px;
+  color: #58a6ff;
+  margin: 0;
+}
+
+.lang-btn {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.lang-btn:hover { border-color: #58a6ff; color: #58a6ff; }
 
 /* 添加账号表单 */
 .add-form {
@@ -173,7 +192,10 @@ h1 {
 </head>
 <body>
 <div class="container">
-  <h1>2FA 验证器</h1>
+  <div class="header">
+    <h1>2FA 验证器</h1>
+    <button class="lang-btn" onclick="toggleLang()">EN</button>
+  </div>
 
   <div class="add-form">
     <input id="nameInput" placeholder="名称 (如 github)" type="text">
@@ -187,6 +209,60 @@ h1 {
 <script>
 const PERIOD = 30;
 const DIGITS = 6;
+
+// ===== i18n =====
+let lang = localStorage.getItem("totp_lang") || "zh";
+
+const i18n = {
+  zh: {
+    title: "2FA 验证器",
+    langBtn: "EN",
+    namePh: "名称 (如 github)",
+    keyPh: "密钥 (Base32)",
+    add: "添加",
+    empty: "还没有添加账号<br>在上方输入名称和密钥后点击添加",
+    copied: "已复制!",
+    clickCopy: "点击复制",
+    deleteTitle: "删除",
+    alertEmpty: "请输入名称和密钥",
+    confirmDelete: name => `确定删除 ${name} 吗？`,
+  },
+  en: {
+    title: "2FA Authenticator",
+    langBtn: "中文",
+    namePh: "Name (e.g. github)",
+    keyPh: "Secret Key (Base32)",
+    add: "Add",
+    empty: "No accounts yet<br>Enter name and key above, then click Add",
+    copied: "Copied!",
+    clickCopy: "Click to copy",
+    deleteTitle: "Delete",
+    alertEmpty: "Please enter name and key",
+    confirmDelete: name => `Delete ${name}?`,
+  }
+};
+
+function t(key, ...args) {
+  const v = i18n[lang][key];
+  return typeof v === "function" ? v(...args) : v;
+}
+
+function toggleLang() {
+  lang = lang === "zh" ? "en" : "zh";
+  localStorage.setItem("totp_lang", lang);
+  document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  applyLang();
+  render();
+}
+
+function applyLang() {
+  document.querySelector("h1").textContent = t("title");
+  document.title = t("title");
+  document.querySelector(".lang-btn").textContent = t("langBtn");
+  document.getElementById("nameInput").placeholder = t("namePh");
+  document.getElementById("keyInput").placeholder = t("keyPh");
+  document.querySelector(".add-form button").textContent = t("add");
+}
 
 // ===== Base32 解码 =====
 function base32Decode(s) {
@@ -240,7 +316,7 @@ function render() {
   const accounts = loadAccounts();
 
   if (!Object.keys(accounts).length) {
-    list.innerHTML = '<div class="empty-state">还没有添加账号<br>在上方输入名称和密钥后点击添加</div>';
+    list.innerHTML = `<div class="empty-state">${t("empty")}</div>`;
     return;
   }
 
@@ -251,7 +327,7 @@ function render() {
     card.innerHTML = `
       <div class="card-header">
         <span class="card-name">${escapeHtml(name)}</span>
-        <button class="delete-btn" onclick="deleteAccount('${escapeHtml(name)}')" title="删除">&times;</button>
+        <button class="delete-btn" onclick="deleteAccount('${escapeHtml(name)}')" title="${t("deleteTitle")}">&times;</button>
       </div>
       <div class="code-area">
         <div class="ring-container">
@@ -262,8 +338,8 @@ function render() {
           </svg>
           <span class="ring-text" id="time-${escapeHtml(name)}">30</span>
         </div>
-        <span class="code-value" id="code-${escapeHtml(name)}" onclick="copyCode(this)" title="点击复制">------</span>
-        <span class="copy-hint" id="hint-${escapeHtml(name)}">已复制!</span>
+        <span class="code-value" id="code-${escapeHtml(name)}" onclick="copyCode(this)" title="${t("clickCopy")}">------</span>
+        <span class="copy-hint" id="hint-${escapeHtml(name)}">${t("copied")}</span>
       </div>`;
     list.appendChild(card);
   }
@@ -308,7 +384,7 @@ function copyCode(el) {
 function addAccount() {
   const name = document.getElementById("nameInput").value.trim();
   const key = document.getElementById("keyInput").value.trim();
-  if (!name || !key) return alert("请输入名称和密钥");
+  if (!name || !key) return alert(t("alertEmpty"));
 
   const accounts = loadAccounts();
   accounts[name] = key;
@@ -320,7 +396,7 @@ function addAccount() {
 }
 
 function deleteAccount(name) {
-  if (!confirm(`确定删除 ${name} 吗？`)) return;
+  if (!confirm(t("confirmDelete", name))) return;
   const accounts = loadAccounts();
   delete accounts[name];
   saveAccounts(accounts);
@@ -328,6 +404,7 @@ function deleteAccount(name) {
 }
 
 // 每秒刷新
+applyLang();
 render();
 setInterval(updateCodes, 1000);
 </script>
