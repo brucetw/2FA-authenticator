@@ -6,7 +6,7 @@ A TOTP (RFC 6238) based two-factor authentication code generator with both web a
 
 ## Features
 
-- **Web UI** — Ring countdown timer, one-click copy, multi-account management
+- **Web UI** — Ring countdown timer, one-click copy, multi-account management, language toggle (EN/中文)
 - **CLI** — Zero dependencies, pure Python standard library
 - **Universal Compatibility** — Works with GitHub, Google, Microsoft, Steam, and all TOTP-based services
 - **Local Storage** — Keys are saved in browser localStorage / local files, never uploaded anywhere
@@ -20,6 +20,7 @@ Double-click `验证码.bat` to open in your browser.
 1. Click **Add**, enter a name and secret key
 2. Click the code to copy it to clipboard
 3. The ring countdown shows remaining validity time (green → yellow → red)
+4. Click the **EN/中文** button to switch language
 
 ### CLI
 
