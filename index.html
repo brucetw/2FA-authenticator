@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2FA 验证器</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  min-height: 100vh;
+  padding: 40px 20px;
+}
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+h1 {
+  text-align: center;
+  font-size: 24px;
+  margin-bottom: 32px;
+  color: #58a6ff;
+}
+
+/* 添加账号表单 */
+.add-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.add-form input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background: #161b22;
+  color: #e6edf3;
+  font-size: 14px;
+  outline: none;
+}
+
+.add-form input:focus {
+  border-color: #58a6ff;
+}
+
+.add-form button {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #238636;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.add-form button:hover { background: #2ea043; }
+
+/* 账号卡片 */
+.card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #8b949e;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: #f85149;
+  cursor: pointer;
+  font-size: 18px;
+  opacity: 0.5;
+  line-height: 1;
+}
+
+.delete-btn:hover { opacity: 1; }
+
+/* 验证码区域 */
+.code-area {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* 圆环倒计时 */
+.ring-container {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+}
+
+.ring-svg {
+  transform: rotate(-90deg);
+  width: 72px;
+  height: 72px;
+}
+
+.ring-bg { fill: none; stroke: #21262d; stroke-width: 4; }
+.ring-progress { fill: none; stroke: #238636; stroke-width: 4; transition: stroke-dashoffset 0.5s linear, stroke 0.5s; }
+.ring-progress.warning { stroke: #d29922; }
+.ring-progress.danger { stroke: #f85149; }
+
+.ring-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 13px;
+  font-weight: 700;
+  color: #8b949e;
+}
+
+/* 验证码数字 */
+.code-value {
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  cursor: pointer;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.2s;
+  padding: 4px 12px;
+  border-radius: 8px;
+}
+
+.code-value:hover { background: #21262d; }
+
+.copy-hint {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: #238636;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.copy-hint.show { opacity: 1; }
+
+.empty-state {
+  text-align: center;
+  color: #8b949e;
+  padding: 60px 20px;
+  font-size: 15px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>2FA 验证器</h1>
+
+  <div class="add-form">
+    <input id="nameInput" placeholder="名称 (如 github)" type="text">
+    <input id="keyInput" placeholder="密钥 (Base32)" type="text" style="flex:1.5">
+    <button onclick="addAccount()">添加</button>
+  </div>
+
+  <div id="cardList"></div>
+</div>
+
+<script>
+const PERIOD = 30;
+const DIGITS = 6;
+
+// ===== Base32 解码 =====
+function base32Decode(s) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  s = s.toUpperCase().replace(/[^A-Z2-7]/g, "");
+  let bits = "";
+  for (const ch of s) {
+    const v = alphabet.indexOf(ch);
+    if (v === -1) continue;
+    bits += v.toString(2).padStart(5, "0");
+  }
+  const bytes = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8)
+    bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  return new Uint8Array(bytes);
+}
+
+// ===== TOTP 生成 =====
+async function generateTOTP(secret) {
+  const key = base32Decode(secret);
+  const counter = Math.floor(Date.now() / 1000 / PERIOD);
+  const ctr = new Uint8Array(8);
+  let c = counter;
+  for (let i = 7; i >= 0; i--) { ctr[i] = c & 0xff; c >>>= 8; }
+
+  const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, ctr);
+  const hash = new Uint8Array(sig);
+
+  const offset = hash[hash.length - 1] & 0x0F;
+  const code = ((hash[offset] & 0x7f) << 24 | hash[offset+1] << 16 | hash[offset+2] << 8 | hash[offset+3]) % 10**DIGITS;
+  return String(code).padStart(DIGITS, "0");
+}
+
+function getRemaining() {
+  return PERIOD - Math.floor((Date.now() / 1000) % PERIOD);
+}
+
+// ===== 存储 =====
+function loadAccounts() {
+  try { return JSON.parse(localStorage.getItem("totp_accounts") || "{}"); } catch { return {}; }
+}
+function saveAccounts(accounts) {
+  localStorage.setItem("totp_accounts", JSON.stringify(accounts));
+}
+
+
+// ===== 渲染 =====
+function render() {
+  const list = document.getElementById("cardList");
+  const accounts = loadAccounts();
+
+  if (!Object.keys(accounts).length) {
+    list.innerHTML = '<div class="empty-state">还没有添加账号<br>在上方输入名称和密钥后点击添加</div>';
+    return;
+  }
+
+  list.innerHTML = "";
+  for (const [name, secret] of Object.entries(accounts)) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-name">${escapeHtml(name)}</span>
+        <button class="delete-btn" onclick="deleteAccount('${escapeHtml(name)}')" title="删除">&times;</button>
+      </div>
+      <div class="code-area">
+        <div class="ring-container">
+          <svg class="ring-svg" viewBox="0 0 72 72">
+            <circle class="ring-bg" cx="36" cy="36" r="32"/>
+            <circle class="ring-progress" id="ring-${escapeHtml(name)}" cx="36" cy="36" r="32"
+              stroke-dasharray="201" stroke-dashoffset="0"/>
+          </svg>
+          <span class="ring-text" id="time-${escapeHtml(name)}">30</span>
+        </div>
+        <span class="code-value" id="code-${escapeHtml(name)}" onclick="copyCode(this)" title="点击复制">------</span>
+        <span class="copy-hint" id="hint-${escapeHtml(name)}">已复制!</span>
+      </div>`;
+    list.appendChild(card);
+  }
+  updateCodes();
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+async function updateCodes() {
+  const accounts = loadAccounts();
+  for (const [name, secret] of Object.entries(accounts)) {
+    const codeEl = document.getElementById(`code-${name}`);
+    const ringEl = document.getElementById(`ring-${name}`);
+    const timeEl = document.getElementById(`time-${name}`);
+    if (!codeEl) continue;
+
+    codeEl.textContent = await generateTOTP(secret);
+
+    const remaining = getRemaining();
+    timeEl.textContent = remaining;
+
+    const circumference = 201;
+    const offset = circumference * (1 - remaining / PERIOD);
+    ringEl.setAttribute("stroke-dashoffset", offset);
+
+    ringEl.classList.remove("warning", "danger");
+    if (remaining <= 5) ringEl.classList.add("danger");
+    else if (remaining <= 10) ringEl.classList.add("warning");
+  }
+}
+
+function copyCode(el) {
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const hint = el.parentElement.querySelector(".copy-hint");
+    hint.classList.add("show");
+    setTimeout(() => hint.classList.remove("show"), 1200);
+  });
+}
+
+function addAccount() {
+  const name = document.getElementById("nameInput").value.trim();
+  const key = document.getElementById("keyInput").value.trim();
+  if (!name || !key) return alert("请输入名称和密钥");
+
+  const accounts = loadAccounts();
+  accounts[name] = key;
+  saveAccounts(accounts);
+
+  document.getElementById("nameInput").value = "";
+  document.getElementById("keyInput").value = "";
+  render();
+}
+
+function deleteAccount(name) {
+  if (!confirm(`确定删除 ${name} 吗？`)) return;
+  const accounts = loadAccounts();
+  delete accounts[name];
+  saveAccounts(accounts);
+  render();
+}
+
+// 每秒刷新
+render();
+setInterval(updateCodes, 1000);
+</script>
+</body>
+</html>
